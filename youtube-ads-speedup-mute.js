@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Auto Mute + Custom Ad Speed
 // @namespace    http://tampermonkey.net/
-// @version      2.1
+// @version      2.2
 // @description  Mutes YouTube ads and plays them at a custom speed. Restores user speed after ads, including skipped or pre-roll ads.
 // @author       Adnan Bin Zahir
 // @match        *://www.youtube.com/*
@@ -13,11 +13,14 @@
     'use strict';
 
     const AD_SPEED_MULTIPLIER = 10;
+    const AD_SKIP_PERCENTAGE = 80; // % of ads to skip (speed through). Remaining will play normally.
 
     let lastMutedState = null;
     let wasAdSpeed = false;
     let userPlaybackRate = null;
     let checkInterval = null;
+
+    const shouldSkipAd = () => Math.random() * 100 < AD_SKIP_PERCENTAGE;
 
     function restoreSpeedWhenReady(video) {
         if (!video) return;
@@ -43,6 +46,8 @@
         if (!video) return;
 
         try {
+            const skipAd = shouldSkipAd();
+
             if (isAd && video.playbackRate !== AD_SPEED_MULTIPLIER) {
                 if (video.playbackRate !== 1) {
                     userPlaybackRate = video.playbackRate;
@@ -60,9 +65,14 @@
                 lastMutedState = isAd;
             }
 
-            if (isAd && video.playbackRate !== AD_SPEED_MULTIPLIER) {
-                video.playbackRate = AD_SPEED_MULTIPLIER;
-                wasAdSpeed = true;
+            if (isAd && !wasAdSpeed && skipAd) {
+                const delay = 200 + Math.random() * 300;
+                setTimeout(() => {
+                    if (document.querySelector('.ad-showing')) {
+                        video.playbackRate = AD_SPEED_MULTIPLIER;
+                        wasAdSpeed = true;
+                    }
+                }, delay);
             } else if (!isAd && video.playbackRate === AD_SPEED_MULTIPLIER) {
                 restoreSpeedWhenReady(video);
             }
